@@ -49,3 +49,17 @@ func (s *ServerPool) GetNextValidPeer() *Backend {
 
 	return nil
 }
+
+func NewBackend(rawURL string) *Backend {
+	return &Backend{
+		URL:   rawURL,
+		Alive: true,
+	}
+}
+
+func NewServerPool() *ServerPool {
+	return &ServerPool{
+		backends: make([]*Backend, 0),
+		current:  0,
+	}
+}
