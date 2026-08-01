@@ -45,10 +45,12 @@ func HandleConnection(conn net.Conn, pool *ServerPool) {
 	}
 	defer backendConn.Close()
 
-	_, err = io.Copy(backendConn, conn)
-	if err != nil {
-		log.Println("Error copying data:", err)
-	}
+	go func() {
+		_, err = io.Copy(backendConn, conn)
+		if err != nil {
+			log.Println("Error copying data:", err)
+		}
+	}()
 
 	_, err = io.Copy(conn, backendConn)
 	if err != nil {
