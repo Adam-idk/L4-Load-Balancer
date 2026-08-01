@@ -8,7 +8,7 @@ func main() {
 		pool.AddBackend(NewBackend(url))
 	}
 
-	go StartHealthCheck(pool)
+	go StartHealthCheck(cfg, pool)
 
 	StartServer(cfg, pool)
 }

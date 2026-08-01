@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -32,28 +33,49 @@ func StartServer(cfg *Config, pool *ServerPool) {
 func HandleConnection(conn net.Conn, pool *ServerPool) {
 	defer conn.Close()
 
-	peer := pool.GetNextValidPeer()
-	if peer == nil {
-		log.Println("No valid peer available")
-		return
+	var backendConn net.Conn
+	var err error
+
+	attempts := len(pool.backends)
+	for i := 0; i < attempts; i++ {
+		peer := pool.GetNextValidPeer()
+		if peer == nil {
+			break
+		}
+
+		backendConn, err = net.DialTimeout("tcp", peer.URL, 2*time.Second)
+		if err == nil {
+			break
+		}
+
+		log.Printf("Failed to dial backend %s, marking offline\n", peer.URL)
+		peer.SetAlive(false)
 	}
 
-	backendConn, err := net.DialTimeout("tcp", peer.URL, 2*time.Second)
-	if err != nil {
-		log.Println("Error connecting to backend:", err)
+	if backendConn == nil {
+		log.Println("No healthy backend available")
 		return
 	}
 	defer backendConn.Close()
 
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	go func() {
-		_, err := io.Copy(backendConn, conn)
-		if err != nil {
-			log.Println("Error copying data:", err)
+		defer wg.Done()
+		_, _ = io.Copy(backendConn, conn)
+		if tc, ok := backendConn.(*net.TCPConn); ok {
+			tc.CloseWrite()
 		}
 	}()
 
-	_, err = io.Copy(conn, backendConn)
-	if err != nil {
-		log.Println("Error copying data:", err)
-	}
+	go func() {
+		defer wg.Done()
+		_, _ = io.Copy(conn, backendConn)
+		if tc, ok := conn.(*net.TCPConn); ok {
+			tc.CloseWrite()
+		}
+	}()
+
+	wg.Wait()
 }
