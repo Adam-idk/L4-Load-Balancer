@@ -38,7 +38,7 @@ func (s *ServerPool) GetNextValidPeer() *Backend {
 		return nil
 	}
 
-	next := atomic.AddUint64(&s.current, 1)
+	next := atomic.AddUint64(&s.current, 1) - 1
 
 	for i := uint64(0); i < l; i++ {
 		idx := (next + i) % l
